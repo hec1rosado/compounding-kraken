@@ -1,0 +1,16 @@
+[
+  {
+    "timestamp": "8/18/25 5:58 PM",
+    "token": "ARB",
+    "invested": 3007.05,
+    "profit": 38.51,
+    "notes": "\u2014"
+  },
+  {
+    "timestamp": "8/18/25 6:05 PM",
+    "token": "SUI",
+    "invested": 1000.0,
+    "profit": 12.04,
+    "notes": "latest trade"
+  }
+]
