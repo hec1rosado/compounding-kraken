@@ -1,124 +1,449 @@
-<!doctype html><html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kraken Personal — Compounding to $1M</title>
-<style>
- body{margin:0;padding:24px;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;background:#f6f7f9;color:#111}
- .wrap{max-width:1100px;margin:0 auto}
- h1{margin:0 0 6px;font-size:22px}
- .sub{color:#555;margin:0 0 16px}
- .badge{display:inline-block;padding:3px 8px;border-radius:999px;background:#eef1f4;color:#334155;font-size:12px}
- .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
- .push{margin-left:auto}
- .btn{border:1px solid #d0d5dd;background:#fff;border-radius:10px;padding:8px 12px;font-size:13px;cursor:pointer}
- .card{background:#fff;border:1px solid #e4e7ec;border-radius:12px;padding:12px;margin-top:16px}
- table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e4e7ec;border-radius:12px;overflow:hidden}
- thead th{font-size:12px;color:#667085;text-align:left;background:#f8f9fb;padding:10px;border-bottom:1px solid #e4e7ec}
- tbody td{padding:10px;border-bottom:1px solid #f0f1f3;font-size:13px}
- tbody tr:last-child td{border-bottom:0}
- .muted{color:#6b7280}
-</style>
-</head><body><div class="wrap">
-  <div class="row">
-    <div>
-      <h1>Kraken Personal — Compounding to $1M <span id="source" class="badge">Loading…</span></h1>
-      <p class="sub">Goal: ~1% net per iteration (fees ~0.24% round-trip ⇒ aim ~1.24% gross).</p>
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kraken Personal — Compounding to $1M (Dashboard v5)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .card { @apply bg-white rounded-2xl shadow-sm border border-gray-200; }
+    .metric { @apply text-gray-500 text-sm; }
+    .value { @apply text-gray-900 font-semibold text-xl; }
+    .badge { @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700; }
+    .table-head { @apply text-left text-xs font-semibold text-gray-500 uppercase tracking-wide; }
+    .table-cell { @apply whitespace-nowrap px-3 py-2 text-sm text-gray-900; }
+    details[open] summary .chev { transform: rotate(90deg); }
+    .link { @apply text-sm text-gray-700 underline; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900 antialiased">
+  <div class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+    <header class="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
+      <div>
+        <h1 class="text-2xl md:text-3xl font-bold tracking-tight">Kraken Personal — Compounding to $1M</h1>
+        <p class="text-gray-600 mt-1">Goal: ~1% net per iteration (fees: 0.12% buy + 0.12% sell ⇒ ~0.24% round-trip; aim ~1.24% gross).</p>
+        <div class="mt-2 flex items-center gap-2">
+          <span class="badge" id="sourceBadge">Data source: —</span>
+          <label class="text-sm text-gray-700">Switch:
+            <select id="sourceSelect" class="ml-2 border rounded-md px-2 py-1 text-sm">
+              <option value="auto">Auto (local → remote → inline)</option>
+              <option value="local">Local (this browser)</option>
+              <option value="remote">Remote JSON (repo)</option>
+              <option value="inline">Inline sample</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="downloadJson" class="px-3 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium">Download JSON</button>
+        <button id="downloadCsv" class="px-3 py-2 rounded-lg bg-white border text-gray-900 text-sm font-medium">Download CSV</button>
+        <button id="resetBtn" class="px-3 py-2 rounded-lg bg-white border text-gray-900 text-sm font-medium">Reset Data</button>
+      </div>
+    </header>
+
+    <p class="text-xs text-gray-600 -mt-3 mb-4">
+      Remote mode looks for <code>iterations.json</code> and <code>trades.json</code> next to this file. Use <span class="underline">Download JSON</span> to export files you can upload to the repo.
+    </p>
+
+    <section id="kpis" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"></section>
+
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+      <div class="card p-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="metric">Current Iteration — Net Progress</div>
+            <div class="value" id="netProgressValue">—</div>
+          </div>
+          <span class="badge">Target +1.00% net</span>
+        </div>
+        <div class="mt-3 w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+          <div id="netProgressBar" class="h-3 bg-gray-900 rounded-full" style="width:0%"></div>
+        </div>
+        <p class="text-sm text-gray-600 mt-2" id="netProgressHelp"></p>
+      </div>
+
+      <div class="card p-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="metric">Current Iteration — Capital Allocation</div>
+            <div class="value" id="allocationValue">—</div>
+          </div>
+          <span class="badge" id="expectedBadge">Pool —</span>
+        </div>
+        <div class="mt-3 w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+          <div id="allocationBar" class="h-3 bg-gray-900 rounded-full" style="width:0%"></div>
+        </div>
+        <p class="text-sm text-gray-600 mt-2" id="allocationHelp"></p>
+      </div>
+    </section>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+      <div class="card p-4 lg:col-span-2">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-lg font-semibold">Iteration Summary</h2>
+          <span class="badge">Auto-calculated</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="table-head px-3 py-2">Iteration #</th>
+                <th class="table-head px-3 py-2">Expected Amount to Invest</th>
+                <th class="table-head px-3 py-2">Expected Net Required (1%)</th>
+                <th class="table-head px-3 py-2">Remaining to Invest</th>
+                <th class="table-head px-3 py-2">Actual (Net)</th>
+                <th class="table-head px-3 py-2">Time Frame</th>
+                <th class="table-head px-3 py-2">Tokens</th>
+              </tr>
+            </thead>
+            <tbody id="iterationsTable" class="divide-y divide-gray-100 bg-white"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card p-4">
+        <div class="flex items-start justify-between mb-3">
+          <div>
+            <h2 class="text-lg font-semibold">Derived (Current Iteration)</h2>
+            <p class="text-sm text-gray-600">Updated as trades are added.</p>
+          </div>
+          <div class="text-right">
+            <button id="finalizeBtn" class="px-3 py-1.5 rounded-lg bg-gray-900 text-white text-sm font-medium disabled:opacity-40" disabled>Finalize Iteration</button>
+            <p class="text-xs text-gray-500 mt-1">Enabled when Remaining ≤ 0</p>
+          </div>
+        </div>
+        <ul class="text-sm space-y-1" id="derivedList"></ul>
+      </div>
     </div>
-    <div class="push row">
-      <button id="dlJson" class="btn">Download JSON</button>
-      <button id="reset" class="btn">Reset (clear local)</button>
+
+    <div class="card p-4 mb-6">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-lg font-semibold">Current Iteration — Trades Log</h2>
+        <div class="flex gap-2 items-center">
+          <input id="search" type="text" placeholder="Search token…" class="px-3 py-2 rounded-lg border w-40 text-sm" />
+          <span class="badge" id="tradeCount">0 trades</span>
+        </div>
+      </div>
+      <div class="overflow-x-auto mb-4">
+        <table class="min-w-full">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="table-head px-3 py-2">Timestamp (ET)</th>
+              <th class="table-head px-3 py-2">Token</th>
+              <th class="table-head px-3 py-2">Invested ($)</th>
+              <th class="table-head px-3 py-2">Profit (Net $)</th>
+              <th class="table-head px-3 py-2">Notes</th>
+            </tr>
+          </thead>
+          <tbody id="tradesTable" class="divide-y divide-gray-100 bg-white"></tbody>
+        </table>
+      </div>
+
+      <details class="mt-2">
+        <summary class="flex items-center gap-2 cursor-pointer select-none">
+          <svg class="chev transition h-5 w-5 text-gray-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 0 1-.02-1.06L10.93 10 7.2 6.29a.75.75 0 1 1 1.06-1.06l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.05-.02Z" clip-rule="evenodd"/></svg>
+          <span class="font-medium">Add trade (paste or type)</span>
+          <span class="badge">Records to your browser</span>
+        </summary>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Paste summary</label>
+            <textarea id="pasteInput" rows="6" class="w-full rounded-lg border p-2 text-sm" placeholder="Example:\nSUI trade summary (single buy → single sell):\nInvested Amount: $1,000.00\nSell Amount: $1,012.04\nProfit: $12.04\nSell Timestamp: Aug 18, 2025, 6:05 PM"></textarea>
+            <div class="flex gap-2 mt-2">
+              <button id="parseBtn" class="px-3 py-2 rounded-lg bg-white border text-gray-900 text-sm font-medium">Parse</button>
+              <button id="clearPasteBtn" class="px-3 py-2 rounded-lg bg-white border text-gray-900 text-sm">Clear</button>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">Hints: Token can be inferred from the header (e.g., “SUI trade summary”) or set below.</p>
+          </div>
+
+          <div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Token</label>
+                <input id="token" class="w-full rounded-lg border px-3 py-2 text-sm" placeholder="e.g., SUI" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Timestamp (ET)</label>
+                <input id="timestamp" class="w-full rounded-lg border px-3 py-2 text-sm" placeholder="8/18/25 6:05 PM" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Invested ($)</label>
+                <input id="invested" class="w-full rounded-lg border px-3 py-2 text-sm" placeholder="1000.00" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Sell Amount ($)</label>
+                <input id="sellAmount" class="w-full rounded-lg border px-3 py-2 text-sm" placeholder="1012.04 (optional if Profit given)" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Profit (Net $)</label>
+                <input id="profit" class="w-full rounded-lg border px-3 py-2 text-sm" placeholder="12.04 (optional; computed if Sell - Invested)" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <input id="notes" class="w-full rounded-lg border px-3 py-2 text-sm" placeholder="—" />
+              </div>
+            </div>
+            <div class="flex items-center justify-between mt-3">
+              <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input id="persistToggle" type="checkbox" class="rounded" checked /> Save to this browser (localStorage)
+              </label>
+              <button id="addTradeBtn" class="px-3 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium">Add Trade</button>
+            </div>
+          </div>
+        </div>
+      </details>
     </div>
+
+    <footer class="text-xs text-gray-500 mt-8 space-y-1">
+      <p><strong>Sources:</strong> Auto = Local → Remote JSON → Inline. Force via selector or URL (<code>?data=local|remote|inline</code>). Reset: <code>?reset=1</code> or the button above.</p>
+      <p>Remote JSON endpoints (if uploaded): <a class="link" href="./iterations.json" target="_blank">iterations.json</a> • <a class="link" href="./trades.json" target="_blank">trades.json</a></p>
+    </footer>
   </div>
 
-  <div class="card" id="kpis"></div>
+  <!-- Inline sample data (fallback) -->
+  <script type="application/json" id="iterations-json">[
+    {"iteration":4,"expected":26054.72,"expectedNet":260.55,"remainingInvest":8701.56,"actualNet":201.61,"timeFrame":"8/15/25 6:49 PM – 8/18/25 6:05 PM","tokens":"AVAX, FARTCOIN, PENGU, OP, ATOM, SUI, SOL, ADA, ARB (partial)"},
+    {"iteration":3,"expected":25558.39,"expectedNet":255.58,"remainingInvest":0.00,"actualNet":496.33,"timeFrame":"8/13/25 8:00 PM – 8/15/25 8:32 PM","tokens":"TON, XRP, SOL, ADA, LTC, TAO, FARTCOIN"},
+    {"iteration":2,"expected":25252.46,"expectedNet":252.52,"remainingInvest":0.00,"actualNet":305.93,"timeFrame":"8/13/25 8:00 PM – 8/13/25 11:30 PM","tokens":"AVAX, TAO, PEPE, SUI, SOL, XTZ, FARTCOIN, BTC"},
+    {"iteration":1,"expected":25000.00,"expectedNet":250.00,"remainingInvest":0.00,"actualNet":252.46,"timeFrame":"8/12/25 3:06 PM – 8/13/25 12:00 PM","tokens":"SOL, AVAX, ARB, UNI, LDO, PEPE, ADA, LTC"}
+  ]</script>
 
-  <div class="card">
-    <h3 style="margin:0 0 8px;font-size:16px">Iteration Summary</h3>
-    <table>
-      <thead><tr>
-        <th>Iteration #</th><th>Expected Amount to Invest</th><th>Expected Net Required (1%)</th>
-        <th>Remaining to Invest</th><th>Actual (Net)</th><th>Time Frame</th><th>Tokens</th>
-      </tr></thead>
-      <tbody id="iters"></tbody>
-    </table>
-  </div>
+  <script type="application/json" id="trades-json">[
+    {"timestamp":"8/18/25 5:58 PM","token":"ARB","invested":3007.05,"profit":38.51,"notes":"—"},
+    {"timestamp":"8/18/25 6:05 PM","token":"SUI","invested":1000.00,"profit":12.04,"notes":"latest trade"}
+  ]</script>
 
-  <div class="card">
-    <h3 style="margin:0 0 8px;font-size:16px">Current Iteration — Trades Log</h3>
-    <table>
-      <thead><tr><th>Timestamp (ET)</th><th>Token</th><th>Invested ($)</th><th>Profit (Net $)</th><th>Notes</th></tr></thead>
-      <tbody id="trades"></tbody>
-    </table>
-  </div>
+  <script>
+    const FEES_ROUND_TRIP = 0.24;
+    const LS_KEY = "compoundingDashboardState";
+    const LS_PREF = "compoundingDashboardSourcePref"; // auto | local | remote | inline
 
-  <div class="card">
-    <h3 style="margin:0 0 8px;font-size:16px">Derived (Current Iteration)</h3>
-    <ul id="derived" style="margin:0;padding-left:18px"></ul>
-  </div>
-</div>
+    const $ = (sel) => document.querySelector(sel);
+    const fmtUSD = (n) => n.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+    const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+    const params = new URLSearchParams(location.search);
+    const forceReset = params.get("reset") === "1" || location.hash.includes("reset");
+    if (forceReset) { try { localStorage.removeItem(LS_KEY); } catch {} }
 
-<script>
- const $=s=>document.querySelector(s), usd=n=>Number(n||0).toLocaleString(undefined,{style:"currency",currency:"USD",maximumFractionDigits:2});
- const FEES=0.24;  // % round-trip for guidance only
- async function get(url){ const r=await fetch(url,{cache:"no-store"}); if(!r.ok) throw new Error(url+" "+r.status); return r.json(); }
+    function inlineData(){
+      return {
+        iterations: JSON.parse(document.getElementById("iterations-json").textContent),
+        trades: JSON.parse(document.getElementById("trades-json").textContent)
+      };
+    }
+    function isValidState(s){ return s && Array.isArray(s.iterations) && s.iterations.length>0 && Array.isArray(s.trades); }
+    function parseNumber(x){ if(x===undefined||x===null)return NaN; if(typeof x==="number")return x; return parseFloat(String(x).replace(/[$,%\s,]/g,"")); }
+    function saveState(s){ try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch {} }
 
- (async ()=>{
-   const [iterations,trades]=await Promise.all([get("iterations.json"),get("trades.json")]);
-   $("#source").textContent="Data source: remote JSON";
-   iterations.sort((a,b)=>b.iteration-a.iteration);
-   const cur=iterations[0];
+    async function remoteData(){
+      try {
+        const [it, tr] = await Promise.all([
+          fetch("iterations.json", { cache: "no-store" }),
+          fetch("trades.json", { cache: "no-store" })
+        ]);
+        if (!it.ok || !tr.ok) throw new Error("Remote JSON not found");
+        const [itJson, trJson] = await Promise.all([it.json(), tr.json()]);
+        const state = { iterations: itJson, trades: trJson };
+        if (!isValidState(state)) throw new Error("Remote JSON invalid");
+        return state;
+      } catch (e) {
+        console.warn("Remote data unavailable:", e);
+        return null;
+      }
+    }
 
-   // KPIs
-   const pct=Math.max(0,Math.min(100,(cur.actualNet/cur.expectedNet)*100));
-   $("#kpis").innerHTML = `
-     <div class="row" style="gap:20px;flex-wrap:wrap">
-       <div><div class="muted">Current Iteration</div><div style="font-weight:700;font-size:18px">#${cur.iteration}</div><div class="muted">${cur.timeFrame||"—"}</div></div>
-       <div><div class="muted">Expected Amount to Invest</div><div style="font-weight:700;font-size:18px">${usd(cur.expected)}</div></div>
-       <div><div class="muted">Actual (Net) So Far</div><div style="font-weight:700;font-size:18px">${usd(cur.actualNet)}</div></div>
-       <div><div class="muted">Remaining to Invest</div><div style="font-weight:700;font-size:18px">${usd(cur.remainingInvest)}</div></div>
-       <div><div class="muted">Net Progress</div><div style="font-weight:700;font-size:18px">${pct.toFixed(1)}% of +${usd(cur.expectedNet)} target</div></div>
-     </div>`;
+    async function loadState(){
+      const forced = params.get("data");
+      const pref = localStorage.getItem(LS_PREF) || "auto";
+      const want = forced || pref;
 
-   // Iterations
-   $("#iters").innerHTML = iterations.map(r=>`
-     <tr>
-       <td><strong>#${r.iteration}</strong></td>
-       <td>${usd(r.expected)}</td>
-       <td>${usd(r.expectedNet)}</td>
-       <td>${usd(r.remainingInvest)}</td>
-       <td>${usd(r.actualNet)}${r.iteration===cur.iteration?' <span class="muted">(partial)</span>':''}</td>
-       <td>${r.timeFrame||"—"}</td>
-       <td>${r.tokens||""}</td>
-     </tr>`).join("");
+      async function auto(){
+        try { const raw = localStorage.getItem(LS_KEY); const parsed = raw ? JSON.parse(raw) : null; if (isValidState(parsed)) return { source:"localStorage", data: parsed }; } catch {}
+        const r = await remoteData(); if (r) return { source:"remote JSON", data: r };
+        return { source:"inline sample", data: inlineData() };
+      }
 
-   // Trades
-   $("#trades").innerHTML = trades.map(t=>`
-     <tr>
-       <td>${t.timestamp}</td>
-       <td><strong>${t.token}</strong></td>
-       <td>${usd(t.invested)}</td>
-       <td>${usd(t.profit)}</td>
-       <td>${t.notes||"—"}</td>
-     </tr>`).join("");
+      if (want === "local") {
+        const raw = localStorage.getItem(LS_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        return isValidState(parsed) ? { source:"localStorage", data: parsed } : { source:"inline sample", data: inlineData() };
+      }
+      if (want === "remote") {
+        const r = await remoteData();
+        return r ? { source:"remote JSON", data: r } : { source:"inline sample", data: inlineData() };
+      }
+      if (want === "inline") {
+        return { source:"inline sample", data: inlineData() };
+      }
+      return await auto();
+    }
 
-   // Derived
-   const remainingNet=+(cur.expectedNet-cur.actualNet).toFixed(2);
-   const capitalAllocated=+(cur.expected-cur.remainingInvest).toFixed(2);
-   const allocPct=Math.max(0,Math.min(100,(capitalAllocated/cur.expected)*100));
-   const netNeededPct=cur.remainingInvest>0?(remainingNet/cur.remainingInvest)*100:0;
-   const grossNeededPct=netNeededPct+FEES;
-   $("#derived").innerHTML = `
-     <li>Remaining net to 1% target: <strong>${usd(remainingNet)}</strong></li>
-     <li>Capital invested so far this iteration: <strong>${usd(capitalAllocated)}</strong> (${allocPct.toFixed(1)}%)</li>
-     <li>Running equity (if closed now): <strong>${usd(25000+252.46+305.93+496.33+cur.actualNet)}</strong></li>
-     <li>Net needed on remaining capital: <strong>${netNeededPct.toFixed(2)}%</strong> (≈ <strong>${grossNeededPct.toFixed(2)}% gross</strong> incl. fees)</li>`;
- })().catch(e=>{
-   $("#source").textContent="Error loading JSON";
-   document.body.insertAdjacentHTML("beforeend", "<pre style='white-space:pre-wrap;padding:12px'>"+String(e)+"</pre>");
- });
+    (async () => {
+      const loaded = await loadState();
+      const state = loaded.data;
+      $("#sourceBadge").textContent = "Data source: " + loaded.source;
 
- // helpers
- document.getElementById("dlJson").onclick=()=>Promise.all([get("iterations.json"),get("trades.json")])
-  .then(([I,T])=>{ const a=document.createElement("a"); a.href="data:text/plain;charset=utf-8,"+encodeURIComponent(JSON.stringify({iterations:I,trades:T},null,2)); a.download="compounding-data.json"; a.click(); });
- document.getElementById("reset").onclick=()=>{ try{localStorage.removeItem("compoundingDashboardState");}catch(e){}; location.search="?reset=1&v="+Date.now(); };
-</script>
-</body></html>
+      const selector = $("#sourceSelect");
+      const pref = localStorage.getItem(LS_PREF) || "auto";
+      selector.value = params.get("data") || pref || "auto";
+      selector.addEventListener("change", () => {
+        const v = selector.value;
+        try { localStorage.setItem(LS_PREF, v); } catch {}
+        const url = new URL(location.href);
+        url.searchParams.set("data", v === "auto" ? "" : v);
+        url.searchParams.set("v", String(Date.now()));
+        location.href = url.toString();
+      });
+
+      state.iterations.sort((a,b) => b.iteration - a.iteration);
+      const currentIter = () => state.iterations[0];
+
+      function renderKPIs(){
+        const cur = currentIter();
+        const kpis=[
+          {label:"Current Iteration", value:"#"+cur.iteration, hint:cur.timeFrame||"—"},
+          {label:"Expected Amount to Invest", value:fmtUSD(cur.expected), hint:"Pool this iteration"},
+          {label:"Actual (Net) So Far", value:fmtUSD(cur.actualNet), hint:"Net gains this iteration"},
+          {label:"Remaining to Invest", value:fmtUSD(cur.remainingInvest), hint:"Allocation left"}
+        ];
+        $("#kpis").innerHTML = kpis.map(k=>`
+          <div class="card p-4">
+            <div class="metric">${k.label}</div>
+            <div class="value mt-1">${k.value}</div>
+            <div class="text-xs text-gray-500 mt-1">${k.hint||""}</div>
+          </div>`).join("");
+        $("#expectedBadge").textContent = "Pool " + fmtUSD(cur.expected);
+      }
+
+      function renderIterationsTable(){
+        const rows = state.iterations.map(r=>`
+          <tr>
+            <td class="table-cell font-medium">#${r.iteration}</td>
+            <td class="table-cell">${fmtUSD(r.expected)}</td>
+            <td class="table-cell">${fmtUSD(r.expectedNet)}</td>
+            <td class="table-cell">${fmtUSD(r.remainingInvest)}</td>
+            <td class="table-cell">${fmtUSD(r.actualNet)}${r.iteration===currentIter().iteration?' <span class="text-xs text-gray-500">(partial)</span>':''}</td>
+            <td class="table-cell">${r.timeFrame||"—"}</td>
+            <td class="table-cell">${r.tokens||""}</td>
+          </tr>`).join("");
+        $("#iterationsTable").innerHTML = rows;
+      }
+
+      function renderDerived(){
+        const cur=currentIter();
+        const remainingNet=+(cur.expectedNet-cur.actualNet).toFixed(2);
+        const pctAchieved=clamp((cur.actualNet/cur.expectedNet)*100,0,100);
+        const capitalAllocated=+(cur.expected-cur.remainingInvest).toFixed(2);
+        const allocPct=clamp((capitalAllocated/cur.expected)*100,0,100);
+        const netNeededPct=cur.remainingInvest>0?(remainingNet/cur.remainingInvest)*100:0;
+        const grossNeededPct=netNeededPct+FEES_ROUND_TRIP;
+
+        $("#netProgressValue").textContent=pctAchieved.toFixed(1)+"% of +"+fmtUSD(cur.expectedNet)+" target";
+        $("#netProgressBar").style.width=pctAchieved+"%";
+        $("#netProgressHelp").textContent="Actual (Net): "+fmtUSD(cur.actualNet)+" • Remaining net: "+fmtUSD(remainingNet);
+
+        $("#allocationValue").textContent=allocPct.toFixed(1)+"% allocated";
+        $("#allocationBar").style.width=allocPct+"%";
+        $("#allocationHelp").textContent="Allocated: "+fmtUSD(capitalAllocated)+" • Remaining: "+fmtUSD(cur.remainingInvest);
+
+        $("#derivedList").innerHTML=`
+          <li>Remaining net to 1% target: <strong>${fmtUSD(remainingNet)}</strong></li>
+          <li>% of net target achieved: <strong>${pctAchieved.toFixed(1)}%</strong></li>
+          <li>Capital invested so far this iteration: <strong>${fmtUSD(capitalAllocated)}</strong></li>
+          <li>Running equity (if closed now): <strong>${fmtUSD(25000+252.46+305.93+496.33+cur.actualNet)}</strong></li>
+          <li>Net needed on remaining capital: <strong>${netNeededPct.toFixed(2)}%</strong> (≈ <strong>${grossNeededPct.toFixed(2)}% gross</strong> incl. fees)</li>`;
+
+        $("#finalizeBtn").disabled = cur.remainingInvest>0;
+      }
+
+      function renderTrades(filterTerm=""){
+        const term=(filterTerm||"").trim().toLowerCase();
+        const filtered = term ? state.trades.filter(t=> (t.token||"").toLowerCase().includes(term)) : state.trades;
+        $("#tradeCount").textContent = filtered.length + (filtered.length===1?" trade":" trades");
+        $("#tradesTable").innerHTML = filtered.map(t=>`
+          <tr>
+            <td class="table-cell">${t.timestamp}</td>
+            <td class="table-cell font-medium">${t.token}</td>
+            <td class="table-cell">${fmtUSD(t.invested)}</td>
+            <td class="table-cell">${fmtUSD(t.profit)}</td>
+            <td class="table-cell">${t.notes||"—"}</td>
+          </tr>`).join("");
+      }
+
+      function refreshAll(){ renderKPIs(); renderIterationsTable(); renderDerived(); renderTrades($("#search").value||""); }
+
+      // form & actions
+      $("#search").addEventListener("input",(e)=>renderTrades(e.target.value));
+      $("#parseBtn").addEventListener("click",()=>{
+        const text = $("#pasteInput").value;
+        const out = { token:"",timestamp:"",invested:"",sellAmount:"",profit:"",notes:"" };
+        if(text){
+          const mHeader=text.match(/^\s*([A-Z0-9.\-_/]+)\s+trade summary/i);
+          const mToken=text.match(/Token\s*:\s*([A-Za-z0-9.\-_/]+)/i);
+          out.token=(mToken&&mToken[1])||(mHeader&&mHeader[1])||"";
+          const mInv=text.match(/Invested\s*Amount\s*:\s*\$?([\d,]+(?:\.\d{1,2})?)/i); if(mInv) out.invested=mInv[1];
+          const mSell=text.match(/Sell\s*Amount\s*:\s*\$?([\d,]+(?:\.\d{1,2})?)/i); if(mSell) out.sellAmount=mSell[1];
+          const mP=text.match(/Profit\s*:\s*\$?([\d,]+(?:\.\d{1,2})?)/i); if(mP) out.profit=mP[1];
+          const mTs1=text.match(/Sell\s*Timestamp\s*:\s*([^\n]+)/i); const mTs2=text.match(/Timestamp\s*:\s*([^\n]+)/i);
+          out.timestamp=(mTs1&&mTs1[1].trim())||(mTs2&&mTs2[1].trim())||"";
+        }
+        $("#token").value = out.token||"";
+        $("#timestamp").value = out.timestamp||"";
+        $("#invested").value = out.invested||"";
+        $("#sellAmount").value = out.sellAmount||"";
+        $("#profit").value = out.profit||"";
+        $("#notes").value = out.notes||"";
+      });
+      $("#clearPasteBtn").addEventListener("click",()=>{
+        $("#pasteInput").value="";
+        ["token","timestamp","invested","sellAmount","profit","notes"].forEach(id=>$("#"+id).value="");
+      });
+      $("#addTradeBtn").addEventListener("click",()=>{
+        const token=$("#token").value.trim();
+        const timestamp=$("#timestamp").value.trim();
+        const invested=parseNumber($("#invested").value);
+        const sellAmount=parseNumber($("#sellAmount").value);
+        let profit=parseNumber($("#profit").value);
+        const notes=$("#notes").value.trim()||"—";
+        if(!token||!timestamp||isNaN(invested)){ alert("Token, Timestamp, and Invested are required."); return; }
+        if(isNaN(profit)){ if(!isNaN(sellAmount)){ profit=+(sellAmount-invested).toFixed(2); } else { alert("Provide either Profit (Net) or Sell Amount."); return; } }
+        const trade={ timestamp, token, invested:+invested.toFixed(2), profit:+profit.toFixed(2), notes };
+        state.trades.push(trade);
+        const cur=state.iterations.sort((a,b)=>b.iteration-a.iteration)[0];
+        const tokenList=(cur.tokens||"").split(",").map(s=>s.trim()).filter(Boolean);
+        if(!tokenList.map(s=>s.toUpperCase()).includes(trade.token.toUpperCase())) tokenList.push(trade.token);
+        cur.tokens=tokenList.join(", ");
+        const start=(cur.timeFrame||"").split("–")[0]?.trim()||"";
+        cur.timeFrame = start ? (start+" – "+trade.timestamp) : ("—"+" – "+trade.timestamp);
+        cur.remainingInvest=+(cur.remainingInvest-trade.invested).toFixed(2);
+        cur.actualNet=+(cur.actualNet+trade.profit).toFixed(2);
+        try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch {}
+        refreshAll();
+        ["timestamp","invested","sellAmount","profit","notes"].forEach(id=>$("#"+id).value="");
+      });
+      $("#finalizeBtn").addEventListener("click",()=>{
+        const cur = state.iterations.sort((a,b)=>b.iteration-a.iteration)[0];
+        if(cur.remainingInvest>0) return;
+        const nextIterNum=cur.iteration+1;
+        const nextExpected=+(cur.expected+cur.actualNet).toFixed(2);
+        const next={ iteration:nextIterNum, expected:nextExpected, expectedNet:+(nextExpected*0.01).toFixed(2), remainingInvest:+nextExpected.toFixed(2), actualNet:0.00, timeFrame:"", tokens:"" };
+        state.iterations.unshift(next);
+        saveState(state);
+        refreshAll();
+        alert("Iteration finalized. Next iteration #"+nextIterNum+" created with expected "+fmtUSD(nextExpected)+".");
+      });
+      $("#resetBtn").addEventListener("click",()=>{ try{ localStorage.removeItem(LS_KEY);}catch{}; const u=new URL(location.href); u.searchParams.set("reset","1"); u.searchParams.set("v",Date.now()); location.href=u.toString(); });
+
+      // downloads
+      function download(filename,text){ const a=document.createElement('a'); a.href='data:text/plain;charset=utf-8,'+encodeURIComponent(text); a.download=filename; a.style.display='none'; document.body.appendChild(a); a.click(); document.body.removeChild(a); }
+      function toCSV(arr,cols){ const header=cols.join(","); const rows=arr.map(o=>cols.map(c=>{ const v=o[c]??""; if(typeof v==="string"&&(v.includes(",")||v.includes("\"))){ return '"'+v.replace(/"/g,'""')+'"'; } return v; }).join(",")); return [header,...rows].join("\n"); }
+      $("#downloadJson").addEventListener("click",()=>download("compounding-data.json", JSON.stringify(state,null,2)));
+      $("#downloadCsv").addEventListener("click",()=>{ const itersCsv=toCSV(state.iterations,["iteration","expected","expectedNet","remainingInvest","actualNet","timeFrame","tokens"]); const tradesCsv=toCSV(state.trades,["timestamp","token","invested","profit","notes"]); download("compounding-iterations.csv",itersCsv); setTimeout(()=>download("compounding-trades.csv",tradesCsv),200); });
+
+      refreshAll();
+    })();
+  </script>
+</body>
+</html>
